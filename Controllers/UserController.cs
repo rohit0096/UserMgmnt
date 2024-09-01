@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using UserMgmnt.Services.Interface;
 
 namespace UserMgmnt.Controllers
 {
@@ -9,12 +10,23 @@ namespace UserMgmnt.Controllers
     [ApiController]
     public class UserController : ControllerBase
     {
+        private readonly IUserService _userService;
+
+        public UserController(IUserService userService)
+        {
+            _userService = userService;
+        }
+
         [HttpGet("profile")]
         public IActionResult GetUserProfile()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            // Fetch user profile data by userId
-            return Ok(new { UserId = userId });
+            var userName = _userService.GetUserId(User);
+            if (string.IsNullOrEmpty(userName))
+            {
+                return Unauthorized();
+            }
+            // Fetch user profile data by userId (can be added to the service)
+            return Ok(new { userName = userName });
         }
     }
 }

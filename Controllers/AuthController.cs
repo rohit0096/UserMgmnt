@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Text;
 using UserMgmnt.Data;
 using UserMgmnt.Model;
+using UserMgmnt.Services.Interface;
 
 namespace UserMgmnt.Controllers
 {
@@ -14,17 +15,11 @@ namespace UserMgmnt.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly JwtSettings _jwtSettings;
+        private readonly IAuthService _authService;
 
-        public AuthController(UserManager<ApplicationUser> userManager,
-                              SignInManager<ApplicationUser> signInManager,
-                              IOptions<JwtSettings> jwtSettings)
+        public AuthController(IAuthService authService)
         {
-            _userManager = userManager;
-            _signInManager = signInManager;
-            _jwtSettings = jwtSettings.Value;
+            _authService = authService;
         }
 
         [HttpPost("register")]
@@ -33,9 +28,7 @@ namespace UserMgmnt.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = new ApplicationUser { UserName = model.Username, Email = model.Email };
-            var result = await _userManager.CreateAsync(user, model.Password);
-
+            var result = await _authService.RegisterAsync(model);
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
@@ -48,31 +41,12 @@ namespace UserMgmnt.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = await _userManager.FindByNameAsync(model.Username);
-            if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
-            {
-                var token = GenerateJwtToken(user);
-                return Ok(new { Token = token });
-            }
+            var token = await _authService.LoginAsync(model);
+            if (token == null)
+                return Unauthorized();
 
-            return Unauthorized();
+            return Ok(new { Token = token });
         }
-        private string GenerateJwtToken(ApplicationUser user)
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_jwtSettings.Secret);
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(new Claim[]
-                {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Name, user.UserName)
-                }),
-                Expires = DateTime.UtcNow.AddHours(1),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-            };
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
-        }
+
     }
 }
