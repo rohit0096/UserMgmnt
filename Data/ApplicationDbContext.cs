@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using UserMgmnt.Model;
 
 namespace UserMgmnt.Data
 {
@@ -10,9 +10,5 @@ namespace UserMgmnt.Data
            : base(options)
         {
         }
-    }
-    public class ApplicationUser : IdentityUser
-    {
-        // Additional properties can go here, if needed
     }
 }

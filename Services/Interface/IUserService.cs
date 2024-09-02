@@ -5,7 +5,7 @@ namespace UserMgmnt.Services.Interface
     public interface IUserService
     {
         string GetUserId(ClaimsPrincipal user);
-        // Add more methods for user-related operations if needed
+        Task UpdateProfileAsync(string userId, string fileUploadPath, DateTime uploadedDateTime);
     }
 
 }
