@@ -16,35 +16,49 @@ namespace UserMgmnt.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
-
-        public AuthController(IAuthService authService)
+        private readonly ILogger<AuthController> _logger;
+        public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
             _authService = authService;
+            _logger = logger;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] Register model)
         {
+            _logger.LogInformation("Registration attempt for user: {Username}", model.Username);
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
             var result = await _authService.RegisterAsync(model);
             if (!result.Succeeded)
+            {
+                _logger.LogWarning("Registration failed for user: {Username}", model.Username);
                 return BadRequest(result.Errors);
+            }
 
+          _logger.LogInformation("Registration sucesss for user: {Username}", model.Username);
             return Ok(new { Result = "Registration successful" });
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] Login model)
         {
+            _logger.LogInformation("Login attempt for user: {Username}", model.Username);
             if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Login failed for user: {Username}", model.Username);
                 return BadRequest(ModelState);
-
+            }
+                
             var token = await _authService.LoginAsync(model);
             if (token == null)
+            {
+                _logger.LogWarning("Login failed for user 401 Permission Denied: {Username}", model.Username);
                 return Unauthorized();
-
+            }
+               
+           _logger.LogInformation("Login successful for user: {Username}", model.Username);
             return Ok(new { Token = token });
         }
 
