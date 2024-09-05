@@ -4,7 +4,6 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using UserMgmnt.Data;
 using UserMgmnt.Model;
 using UserMgmnt.Services.Interface;
 
@@ -14,51 +13,89 @@ namespace UserMgmnt.Services
     public class AuthService : IAuthService
     {
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly JwtSettings _jwtSettings;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(UserManager<ApplicationUser> userManager,
-                           SignInManager<ApplicationUser> signInManager,
-                           IOptions<JwtSettings> jwtSettings)
+                           IOptions<JwtSettings> jwtSettings,
+                           ILogger<AuthService> logger)
         {
             _userManager = userManager;
-            _signInManager = signInManager;
             _jwtSettings = jwtSettings.Value;
+            _logger = logger;
         }
 
         public async Task<IdentityResult> RegisterAsync(Register model)
         {
+            _logger.LogInformation("Attempting to register user: {Username}", model.Username);
             var user = new ApplicationUser { UserName = model.Username, Email = model.Email };
-            return await _userManager.CreateAsync(user, model.Password);
+            var result = await _userManager.CreateAsync(user, model.Password);
+
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("User {Username} registered successfully.", model.Username);
+            }
+            else
+            {
+                _logger.LogWarning("User {Username} registration failed. Errors: {Errors}",
+                    model.Username, string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+
+            return result;
         }
 
         public async Task<string> LoginAsync(Login model)
         {
-            var user = await _userManager.FindByNameAsync(model.Username);
-            if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
+            try
             {
+                _logger.LogInformation("Login attempt for user: {Username}", model.Username);
+                var user = await _userManager.FindByNameAsync(model.Username);
+
+                if (user == null)
+                {
+                    _logger.LogWarning("Login failed: User {Username} not found.", model.Username);
+                    return null;
+                }
+                _logger.LogInformation("Login successful for user: {Username}", model.Username);
                 return GenerateJwtToken(user);
             }
-
-            return null;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred during login for user {Username}.", model.Username);
+                throw;
+            }
         }
 
         private string GenerateJwtToken(ApplicationUser user)
         {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_jwtSettings.Secret);
-            var tokenDescriptor = new SecurityTokenDescriptor
+            try
             {
-                Subject = new ClaimsIdentity(new Claim[]
+                _logger.LogInformation("Generating JWT token for user: {Username}", user.UserName);
+
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.ASCII.GetBytes(_jwtSettings.Secret);
+
+                var tokenDescriptor = new SecurityTokenDescriptor
                 {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Name, user.UserName)
-                }),
-                Expires = DateTime.UtcNow.AddHours(1),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-            };
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
+                    Subject = new ClaimsIdentity(new Claim[]
+                    {
+                    new Claim(ClaimTypes.NameIdentifier, user.Id),
+                    new Claim(ClaimTypes.Name, user.UserName)
+                    }),
+                    Expires = DateTime.UtcNow.AddHours(1),
+                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+                };
+
+                var token = tokenHandler.CreateToken(tokenDescriptor);
+                _logger.LogInformation("JWT token generated successfully for user: {Username}", user.UserName);
+
+                return tokenHandler.WriteToken(token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while generating JWT token for user: {Username}.", user.UserName);
+                throw;
+            }
         }
     }
 

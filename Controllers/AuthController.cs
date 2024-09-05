@@ -27,39 +27,65 @@ namespace UserMgmnt.Controllers
         public async Task<IActionResult> Register([FromBody] Register model)
         {
             _logger.LogInformation("Registration attempt for user: {Username}", model.Username);
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
 
-            var result = await _authService.RegisterAsync(model);
-            if (!result.Succeeded)
+            try
             {
-                _logger.LogWarning("Registration failed for user: {Username}", model.Username);
-                return BadRequest(result.Errors);
-            }
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
 
-          _logger.LogInformation("Registration sucesss for user: {Username}", model.Username);
-            return Ok(new { Result = "Registration successful" });
+                var result = await _authService.RegisterAsync(model);
+
+                if (!result.Succeeded)
+                {
+                    _logger.LogWarning("Registration failed for user: {Username}", model.Username);
+
+                    // Handle specific error scenarios
+                    if (!result.Succeeded)
+                    {
+                        _logger.LogWarning("Registration failed for user: {Username}", model.Username);
+                        return BadRequest(result.Errors);
+                    }
+                }
+
+                _logger.LogInformation("Registration success for user: {Username}", model.Username);
+                return Ok(new { Result = "Registration successful" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("An error occurred during registration: {ErrorMessage}", ex.Message);
+                return StatusCode(500, "Internal Server Error");
+            }
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] Login model)
         {
             _logger.LogInformation("Login attempt for user: {Username}", model.Username);
-            if (!ModelState.IsValid)
+
+            try
             {
-                _logger.LogWarning("Login failed for user: {Username}", model.Username);
-                return BadRequest(ModelState);
+                if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning("Login failed for user: {Username}", model.Username);
+                    return BadRequest(ModelState);
+                }
+                var token = await _authService.LoginAsync(model);
+
+                if (token == null)
+                {
+                    _logger.LogWarning("Login failed for user 401 Permission Denied: {Username}", model.Username);
+                    return Unauthorized();
+                }
+                _logger.LogInformation("Login successful for user: {Username}", model.Username);
+                return Ok(new { Token = token });
             }
-                
-            var token = await _authService.LoginAsync(model);
-            if (token == null)
+            catch (Exception ex)
             {
-                _logger.LogWarning("Login failed for user 401 Permission Denied: {Username}", model.Username);
-                return Unauthorized();
+                _logger.LogError("An error occurred during login: {ErrorMessage}", ex.Message);
+                return StatusCode(500, "Internal Server Error");
             }
-               
-           _logger.LogInformation("Login successful for user: {Username}", model.Username);
-            return Ok(new { Token = token });
         }
 
     }
