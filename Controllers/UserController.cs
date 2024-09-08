@@ -19,23 +19,25 @@ namespace UserMgmnt.Controllers
         }
 
         [HttpGet("profile")]
-        public IActionResult GetUserProfile()
+        public async Task<IActionResult> GetUserProfile()
         {
-            var userName = _userService.GetUserId(User);
             try
             {
+                var userName = await _userService.GetUserAsync(User);
+
                 if (string.IsNullOrEmpty(userName))
                 {
-                    _logger.LogWarning("You are Unauthorized  user: {Username}", userName);
+                    _logger.LogWarning("Unauthorized access attempt by user: {Username}", userName);
                     return Unauthorized();
                 }
-                // Fetch user profile data by userId (can be added to the service)  
-                _logger.LogInformation("user profile Retrival : {Username}", userName);
+
+                // Fetch user profile data by userId (can be added to the service)
+                _logger.LogInformation("User profile retrieved for: {Username}", userName);
                 return Ok(new { userName = userName });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving user profile: {Username}", userName);
+                _logger.LogError(ex, "Error retrieving user profile for: {Username}", User.Identity?.Name);
                 return StatusCode(500, "Internal Server Error");
             }
         }

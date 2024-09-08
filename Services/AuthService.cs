@@ -28,6 +28,18 @@ namespace UserMgmnt.Services
         public async Task<IdentityResult> RegisterAsync(Register model)
         {
             _logger.LogInformation("Attempting to register user: {Username}", model.Username);
+            var existingUser = await _userManager.FindByNameAsync(model.Username);
+            if (existingUser!=null)
+            {
+                _logger.LogWarning("Registration failed: Username {Username} is already taken.", model.Username);
+                return IdentityResult.Failed(new IdentityError
+                {
+                    Code = "UsernameTaken",
+                    Description = $"Username '{model.Username}' is already taken."
+                });
+            }
+
+            _logger.LogInformation("Attempting to register user: {Username}", model.Username);
             var user = new ApplicationUser { UserName = model.Username, Email = model.Email };
             var result = await _userManager.CreateAsync(user, model.Password);
 
@@ -56,6 +68,15 @@ namespace UserMgmnt.Services
                     _logger.LogWarning("Login failed: User {Username} not found.", model.Username);
                     return null;
                 }
+                _logger.LogInformation("Login attempt for password: {Password}", model.Password);
+                var validpassword = await _userManager.CheckPasswordAsync(user,model.Password);
+
+                if (!validpassword)
+                {
+                    _logger.LogWarning("Login failed: User {Password} not found.", model.Password);
+                    return null;
+                }
+
                 _logger.LogInformation("Login successful for user: {Username}", model.Username);
                 return GenerateJwtToken(user);
             }
